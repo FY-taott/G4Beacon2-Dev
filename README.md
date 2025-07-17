@@ -1,6 +1,6 @@
 # G4Beacon2-Dev
 
-This repository contains the source code for G4Beacon2, covering key processes such as training, testing, and analysis, and is available for reference by researchers.
+This repository contains the source code for [G4Beacon2](https://github.com/FY-taott/G4Beacon2/), covering key processes such as training, testing, and analysis, and is available for reference by researchers.
 
 ## Contents
 - [0. User Guide](#0-user-guide)
