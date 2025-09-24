@@ -9,7 +9,11 @@ This repository contains the source code for [G4Beacon2](https://github.com/FY-t
 - [3. Intra-cell-line Test](#3-intra-cell-line-test)
 - [4. Cross-cell-line-Test](#4-cross-cell-line-test)
 - [5. Multi-level Ensemble](#5-multi-level-ensemble)
-
+- [6. CUP and hg19](#6-cup-and-hg19)
+- [7. EndoQuad Test](#7-endoquad-test)
+- [8. pG4 Test](#8-pg4-test)
+- [9. Embedding Analysis](#9-embedding-analysis)
+- [10. Non-pG4 Analysis](#10-non-pg4-analysis)
 
 
 ## 0. User Guide
@@ -191,3 +195,217 @@ paste H9onK562_CellScore.bed HepG2onK562_CellScore.bed WT26onK562_CellScore.bed 
     print $1"\t"$2"\t"$3"\t"power"\t"$5}' \
     > $output_folder/FusionScore_K562.bed
 ```
+
+## 6. CUP and hg19
+```bash
+# To verify that our analyses based on hg19 would not encounter significant issues when converted to hg38 or newer genome assemblies, we performed an overlap analysis with the conversion-unstable regions (CUP regions) during genome assembly version conversion.
+
+wget https://raw.githubusercontent.com/cathaloruaidh/genomeBuildConversion/master/CUP_FILES/FASTA_BED.ALL_GRCh37.novel_CUPs.bed
+
+bedtools intersect -a HepG2_vG4.bed \
+                   -b FASTA_BED.ALL_GRCh37.novel_CUPs.bed \
+                   -wa -u \
+                   > HepG2_CUP.bed
+
+bedtools intersect -a HepG2_vG4.bed \
+                   -b FASTA_BED.ALL_GRCh37.novel_CUPs.bed \
+                   -v \
+                   > HepG2_notCUP.bed
+```
+
+## 7. EndoQuad Test
+
+In the EndoQuad Test, we used the A549 cell line as an example to visually demonstrate the entire prediction process of G4Beacon2 for a new cell line. Section 7.1 presents the preprocessing of the ATAC-seq data, and Section 7.2 illustrates the prediction of vG4s using the preprocessed ATAC-seq data.
+
+### 7.1 ATAC-seq
+```bash
+# We can directly run an end-to-end script to perform z-score normalization.
+bash zscore.sh ENCFF533GVZ.bigWig
+
+# CrossMap
+CrossMap bigwig hg38ToHg19.over.chain.gz \
+                ATAC_pval_zscore.bigwig \
+                A549_ATAC_pval_zscore_hg19.bigwig
+
+# Construct ATAC_zscore.csv
+g4beacon2 atacFeatureConstruct \
+       -p          24 \
+       --g4Input   BinsFromOG4_hg19_plus_origin.bed \
+       --envInput  A549_ATAC_pval_zscore_hg19.bigwig.bw \
+       --csvOutput BinsFromOG4_hg19_plus_A549_zscore.csv
+
+g4beacon2 atacFeatureConstruct \
+       -p          24 \
+       --g4Input   BinsNotFromOG4_hg19_plus_origin.bed \
+       --envInput  A549_ATAC_pval_zscore_hg19.bigwig.bw \
+       --csvOutput BinsNotFromOG4_hg19_plus_A549_zscore.csv
+
+g4beacon2 atacFeatureConstruct \
+       -p          24 \
+       --g4Input   BinsFromOG4_hg19_minus_origin.bed \
+       --envInput  A549_ATAC_pval_zscore_hg19.bigwig.bw \
+       --csvOutput BinsFromOG4_hg19_minus_A549_zscore.csv
+       
+g4beacon2 atacFeatureConstruct \
+       -p          24 \
+       --g4Input   BinsNotFromOG4_hg19_minus_origin.bed \
+       --envInput  A549_ATAC_pval_zscore_hg19.bigwig.bw \
+       --csvOutput BinsNotFromOG4_hg19_minus_A549_zscore.csv     
+```
+
+### 7.2 Prediction
+```bash
+# We provided the complete code for predicting A549 using the HepG2-based model. Within the multi-level ensemble framework, predictions also need to be performed using the models trained on H9-esc and WT26, which can be easily achieved by simply replacing the model files.
+
+for i in {00..04}; do
+  g4beacon2 getValidatedG4s \
+    --seqCSV		BinsFromOG4_hg19_plus_seq.csv \
+    --atacCSV		BinsFromOG4_hg19_plus_A549_zscore.csv \
+    --originBED	BinsFromOG4_hg19_plus_origin.bed \
+    --model		  zscoreDNABERT2_HepG2_ES${i}_0517model.checkpoint.joblib \
+    -o			    HepG2onA549_BinsFromOG4_ES${i}_plus.bed
+
+  g4beacon2 getValidatedG4s \
+    --seqCSV		Git/BinsFromOG4_hg19_minus_seq.csv \
+    --atacCSV		ATAC/BinsFromOG4_hg19_minus_A549_zscore.csv \
+    --originBED	Git/BinsFromOG4_hg19_minus_origin.bed \
+    --model		  Git/zscoreDNABERT2_HepG2_ES${i}_0517model.checkpoint.joblib \
+    -o 			    HepG2onA549_BinsFromOG4_ES${i}_minus.bed
+done
+
+for i in {00..04}; do
+  g4beacon2 getValidatedG4s \
+    --seqCSV		Git/BinsNotFromOG4_hg19_plus_seq.csv \
+    --atacCSV		ATAC/BinsNotFromOG4_hg19_plus_A549_zscore.csv \
+    --originBED	Git/BinsNotFromOG4_hg19_plus_origin.bed \
+    --model		  Git/zscoreDNABERT2_HepG2_ES${i}_0517model.checkpoint.joblib \
+    -o			    HepG2onA549_BinsNotFromOG4_ES${i}_plus.bed
+
+  g4beacon2 getValidatedG4s \
+    --seqCSV		Git/BinsNotFromOG4_hg19_minus_seq.csv \
+    --atacCSV		ATAC/BinsNotFromOG4_hg19_minus_A549_zscore.csv \
+    --originBED	Git/BinsNotFromOG4_hg19_minus_origin.bed \
+    --model		  Git/zscoreDNABERT2_HepG2_ES${i}_0517model.checkpoint.joblib \
+    -o			    HepG2onA549_BinsNotFromOG4_ES${i}_minus.bed
+done
+
+# We performed an intersection operation on the raw narrowPeak files provided by EndoQuad.
+bedtools intersect -a A549_G4chip_rep1_peaks.narrowPeak \
+                   -b A549_G4chip_rep2_peaks.narrowPeak \
+                   > A549_intersection.bed
+
+## Labels were generated based on the G4 data. After calculating the cell score and fusion score, the prediction file was obtained.
+bash annotate_HepG2onA549_FromOG4.sh
+bash annotate_HepG2onA549_NotFromOG4.sh
+bash fusionScore.sh
+```
+
+## 8. pG4 Test
+```bash
+# Due to the heterogeneous formats of the pG4 data, we applied customized processing to convert them into standardized three-column BED files. To distinguish these from the original files, we labeled the preprocessed pG4 files with the .bed3 extension in this study.
+bash preparepG4.sh
+
+# The -F command was used to reduce false positives, which is consistent with the established strategy of G4Beacon and G4Beacon2.
+bash pG4overlap.sh
+
+# Generation of the confusion matrix and performance table
+Rscript getConfusion.R
+
+```
+## 9. Embedding Analysis
+### 9.1 High-Importance Features
+```bash
+# The most important features were identified based on their rankings and median ranking values.
+bash SumRank.sh
+python3 Median.py
+bash sort.sh
+```
+
+### 9.2 Feature Embedding
+```bash
+# UCSC annotation prepared
+bash prepareUCSC.sh
+
+# Upstream region processed
+bash make_excl.sh
+bash STD_remove.sh
+bash getshuf.sh
+bash getFasta.sh
+python3 embedding.py
+
+# (optional) 1-kb scale if needed
+bash slop.sh
+
+# (optional) Negative shuffle for intergenic regions
+bash negative.sh
+
+# boxplot
+Rscript boxplot.R
+```
+
+## 10. Non-pG4 Analysis
+We used all untreated-group K562 G4 datasets from the EndoQuad database to identify high-confidence G4s. Peaks detected in more than two-thirds of the replicates (≥10 replicates) were defined as high-confidence G4s.
+### 10.1 High-Confidence G4
+```bash
+chipr -i K562_GSE107690_rep1_STD.narrowPeak \
+         K562_GSE107690_rep2_STD.narrowPeak \
+         K562_GSE145090_STD.narrowPeak \
+         K562_GSE162299_noTPL_bio1_STD.narrowPeak \
+         K562_GSE162299_noTPL_bio2_STD.narrowPeak \
+         K562_GSE162299_noTPL_bio3_STD.narrowPeak \
+         K562_GSE162299_noTPL_bio4_STD.narrowPeak \
+         K562_GSE162299_noDRB_bio1_STD.narrowPeak \
+         K562_GSE162299_noDRB_bio2_STD.narrowPeak \
+         K562_GSE162299_noDRB_bio3_STD.narrowPeak \
+         K562_GSE162299_noDRB_bio4_STD.narrowPeak \
+         K562_GSE162299_normoxia_bio1_STD.narrowPeak \
+         K562_GSE162299_normoxia_bio2_STD.narrowPeak \
+         K562_GSE162299_normoxia_bio3_STD.narrowPeak \
+         -m 10 \
+         -o K562_m10_peaks
+
+# Subsequently, we selected high-confidence G4s lacking PQS support and submitted them to the EndoQuad PQSfinder online tool to generate a TXT file using a score threshold of 20.
+
+bedtools intersect -a K562_m10_peaks_all.bed \
+                   -b PQS_Human_G4.bed \
+                   -wa -u \
+                   > K562_m10_withPQS_all.bed
+
+bedtools intersect -a K562_m10_peaks_all.bed \
+                   -b PQS_Human_G4.bed \
+                   -v \
+                   > K562_m10_withoutPQS_all.bed
+                   
+bedtools getfasta -fi /mnt/disk1/tiantong/workspace/2025/0529revision/0.checkNdata/2.usedData/hg19.fa \
+                  -bed K562_m10_withoutPQS_all.bed \
+                  -fo K562_m10_withoutPQS_all.fa
+
+## We submitted them to the EndoQuad PQSfinder online tool, and obtained "K562_m10_withoutPQS_EndoQuad_PQS20.txt"
+```
+### 10.2 G/C
+```bash
+#Using the TXT file generated by EndoQuad, the existing high-confidence G4s were classified into three categories: those with default PQS support, those with low-scoring PQS support, and those without any PQS support. A custom script was then executed to visualize the GC content of these categories.
+
+awk 'BEGIN{OFS="\t"} 
+     $1 ~ /^#/ || $1=="region"{next} 
+     {
+       split($1,a,/[:\-]/); 
+       print a[1],a[2],a[3]
+     }' K562_m10_withoutPQS_EndoQuad_PQS20.txt \
+     > K562_m10_withoutPQS_EndoQuad_PQS20.bed
+
+bedtools intersect -a K562_m10_withoutPQS_all.bed \
+                   -b K562_m10_withoutPQS_EndoQuad_PQS20.bed \
+                   -v \
+                   > K562_m10_withoutPQS_all_without20score.bed
+
+bedtools intersect -a K562_m10_withoutPQS_all.bed \
+                   -b K562_m10_withoutPQS_EndoQuad_PQS20.bed \
+                   -wa -u \
+                   > K562_m10_withoutPQS_all_with20score.bed
+
+bash getGC.sh
+Rscript GCplot.R
+```
+
+
