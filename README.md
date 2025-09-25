@@ -266,26 +266,26 @@ for i in {00..04}; do
     -o			    HepG2onA549_BinsFromOG4_ES${i}_plus.bed
 
   g4beacon2 getValidatedG4s \
-    --seqCSV		Git/BinsFromOG4_hg19_minus_seq.csv \
-    --atacCSV		ATAC/BinsFromOG4_hg19_minus_A549_zscore.csv \
-    --originBED	Git/BinsFromOG4_hg19_minus_origin.bed \
-    --model		  Git/zscoreDNABERT2_HepG2_ES${i}_0517model.checkpoint.joblib \
+    --seqCSV		BinsFromOG4_hg19_minus_seq.csv \
+    --atacCSV		BinsFromOG4_hg19_minus_A549_zscore.csv \
+    --originBED	BinsFromOG4_hg19_minus_origin.bed \
+    --model		  zscoreDNABERT2_HepG2_ES${i}_0517model.checkpoint.joblib \
     -o 			    HepG2onA549_BinsFromOG4_ES${i}_minus.bed
 done
 
 for i in {00..04}; do
   g4beacon2 getValidatedG4s \
-    --seqCSV		Git/BinsNotFromOG4_hg19_plus_seq.csv \
-    --atacCSV		ATAC/BinsNotFromOG4_hg19_plus_A549_zscore.csv \
-    --originBED	Git/BinsNotFromOG4_hg19_plus_origin.bed \
-    --model		  Git/zscoreDNABERT2_HepG2_ES${i}_0517model.checkpoint.joblib \
+    --seqCSV		BinsNotFromOG4_hg19_plus_seq.csv \
+    --atacCSV		BinsNotFromOG4_hg19_plus_A549_zscore.csv \
+    --originBED	BinsNotFromOG4_hg19_plus_origin.bed \
+    --model		  zscoreDNABERT2_HepG2_ES${i}_0517model.checkpoint.joblib \
     -o			    HepG2onA549_BinsNotFromOG4_ES${i}_plus.bed
 
   g4beacon2 getValidatedG4s \
-    --seqCSV		Git/BinsNotFromOG4_hg19_minus_seq.csv \
-    --atacCSV		ATAC/BinsNotFromOG4_hg19_minus_A549_zscore.csv \
-    --originBED	Git/BinsNotFromOG4_hg19_minus_origin.bed \
-    --model		  Git/zscoreDNABERT2_HepG2_ES${i}_0517model.checkpoint.joblib \
+    --seqCSV		BinsNotFromOG4_hg19_minus_seq.csv \
+    --atacCSV		BinsNotFromOG4_hg19_minus_A549_zscore.csv \
+    --originBED	BinsNotFromOG4_hg19_minus_origin.bed \
+    --model		  zscoreDNABERT2_HepG2_ES${i}_0517model.checkpoint.joblib \
     -o			    HepG2onA549_BinsNotFromOG4_ES${i}_minus.bed
 done
 
@@ -376,7 +376,7 @@ bedtools intersect -a K562_m10_peaks_all.bed \
                    -v \
                    > K562_m10_withoutPQS_all.bed
                    
-bedtools getfasta -fi /mnt/disk1/tiantong/workspace/2025/0529revision/0.checkNdata/2.usedData/hg19.fa \
+bedtools getfasta -fi hg19.fa \
                   -bed K562_m10_withoutPQS_all.bed \
                   -fo K562_m10_withoutPQS_all.fa
 
