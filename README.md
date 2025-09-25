@@ -190,9 +190,9 @@ WT26para=4
 H9para=1
 
 paste H9onK562_CellScore.bed HepG2onK562_CellScore.bed WT26onK562_CellScore.bed | \
-    awk -v h9=$H9para -v hep=$HepG2para -v WT26=$WT26para -v \
+    awk -v h9=$H9para -v hep=$HepG2para -v WT26=$WT26para\
     '{power=exp((log($4)*h9 + log($8)*hep + log($12)*WT26)/(h9 + hep + WT26)); \
-    print $1"\t"$2"\t"$3"\t"power"\t"$5}' \
+    print $1"\t"$2"\t"$3"\t"power}' \
     > $output_folder/FusionScore_K562.bed
 ```
 
