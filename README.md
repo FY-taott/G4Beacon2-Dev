@@ -14,6 +14,7 @@ This repository contains the source code for [G4Beacon2](https://github.com/FY-t
 - [8. pG4 Test](#8-pg4-test)
 - [9. Embedding Analysis](#9-embedding-analysis)
 - [10. Non-pG4 Analysis](#10-non-pg4-analysis)
+- [11. Mutation Analysis](#11-mutation-analysis)
 
 
 ## 0. User Guide
@@ -406,6 +407,23 @@ bedtools intersect -a K562_m10_withoutPQS_all.bed \
 
 bash getGC.sh
 Rscript GCplot.R
+```
+
+## 11. Mutation Analysis
+```bash
+# Here, we present a mutation analysis method that generates RMT files using a home-made script, which are then used to guide mutation experiments. It is important to note that the mutation rate in the getRMT.sh file, called by the script, needs to be manually adjusted. By default, we set it to the maximum value allowed by the software, 0.5, but during actual usage, this mutation rate can be adjusted as needed.
+
+awk '{print ">seq"NR"\n"$0}' path/to/input/data > plus_shuf500.fasta
+
+for start in 100 300 500 700 900 1100 1300 1500 1700; do
+    end=$((start + 200))
+    cp plus_shuf500.fasta plus_shuf500_${start}_${end}.fasta
+    bash getRMT.sh 500 $start $end plus_MS_${start}_${end}.rmt
+    mutation-simulator plus_shuf500_${start}_${end}.fasta rmt plus_MS_${start}_${end}.rmt
+    grep -v "^>" plus_shuf500_${start}_${end}_ms.fasta > plus_shuf500_${start}_${end}_ms.txt
+
+done
+
 ```
 
 
