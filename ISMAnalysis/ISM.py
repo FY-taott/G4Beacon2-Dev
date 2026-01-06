@@ -67,7 +67,8 @@ def main():
     mut_minus_ref_euclidean = np.sqrt(np.sum(np.square(mut_minus_ref), -1) / 3)
 
     # Zoom in heatmap of base x position
-    ZOOM_IN = range(1, 1999)
+    # We use the 800-1200bp range to focus on the core region, as the flanking regions' effects, which may involve regulation, are not the focus of this study.
+    ZOOM_IN = range(800, 1200)
 
     plt.figure(figsize=(40,5))
     to_plot = mut_minus_ref[SEQ_IDX, ZOOM_IN, TASK_IDX].T
@@ -78,19 +79,19 @@ def main():
                 xticklabels = 10,
                 yticklabels = ['A','C','G','T'],
                 cbar_kws = dict(use_gridspec=False,location="top"))
-    plt.savefig("TESTNAME_std_0001_1999_HEATMAP_DATE.png",dpi=300)
+    plt.savefig("TESTNAME_std_800_1200_HEATMAP_DATE.png",dpi=300)
     plt.show()
 
     plt.figure(figsize=(40,2))
     plt.plot(mut_minus_ref_euclidean[SEQ_IDX, ZOOM_IN, TASK_IDX])
     plt.margins(0.01, 0.01)
-    plt.savefig("TESTNAME_std_0001_1999_ISMSCORE_DATE.png",dpi=300)
+    plt.savefig("TESTNAME_std_800_1200_ISMSCORE_DATE.png",dpi=300)
     plt.show()
 
     vizsequence.plot_weights(
           np.expand_dims(mut_minus_ref_euclidean[SEQ_IDX, ZOOM_IN, TASK_IDX], -1)*onehot_sequences[SEQ_IDX, ZOOM_IN],
           figsize=(40,2))
-    plt.savefig("TESTNAME_std_0001_1999_LOGO_DATE.png",dpi=300)
+    plt.savefig("TESTNAME_std_800_1200_LOGO_DATE.png",dpi=300)
     plt.show()
 
 
