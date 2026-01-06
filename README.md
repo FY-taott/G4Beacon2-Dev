@@ -7,7 +7,7 @@ This repository contains the source code for [G4Beacon2](https://github.com/FY-t
 - [1. Environment Setup](#1-environment-setup)
 - [2. Dataset Construction](#2-dataset-construction)
 - [3. Intra-cell-line Test](#3-intra-cell-line-test)
-- [4. Cross-cell-line-Test](#4-cross-cell-line-test)
+- [4. Cross-cell-line Test](#4-cross-cell-line-test)
 - [5. Multi-level Ensemble](#5-multi-level-ensemble)
 - [6. CUP and hg19](#6-cup-and-hg19)
 - [7. EndoQuad Test](#7-endoquad-test)
@@ -15,7 +15,7 @@ This repository contains the source code for [G4Beacon2](https://github.com/FY-t
 - [9. Embedding Analysis](#9-embedding-analysis)
 - [10. Non-pG4 Analysis](#10-non-pg4-analysis)
 - [11. Mutation Analysis](#11-mutation-analysis)
-
+- [12. ISM Analysis](#12-ism-analysis)
 
 ## 0. User Guide
 We would like to provide two important clarifications here. First, we will explain the guidelines for including code in this repository to ensure there are no misunderstandings during its use. Then, we will offer some recommendations to help ensure the code functions as intended and delivers the expected results.
@@ -425,5 +425,64 @@ for start in 100 300 500 700 900 1100 1300 1500 1700; do
 done
 
 ```
+## 12. ISM Analysis
 
+This section also performs mutation analysis. In contrast to the macro-level and interval-based mutation analysis presented in the previous section, ISM analysis is conducted at the nucleotide level, focusing on point mutations. The workflow is based on the standard ISM protocol, with detailed descriptions provided in the paper.
+
+Please NOTE that due to the embedding operations involved in G4Beacon2, performing nucleotide-level mutations on a SINGLE sequence can take several HOURS (depending on hardware specifications). For faster analysis, please refer to Section 11.
+
+The input BED file consists of a single sequence, represented by three columns per line.
+
+```bash
+# 1. Use G4Beacon2 to predict the single G4 sequence to be analyzed.
+g4beacon2 seqFeatureConstruct \
+    -i 		TESTNAME_std.bed \
+    -oseq 	TESTNAME_std.oseq.csv \
+    -obi 		TESTNAME_std.origin.bed \
+    -fi 		[path/to/hg19.fa]
+
+g4beacon2 atacFeatureConstruct \
+       -p          24 \
+       --g4Input   TESTNAME_std.origin.bed \
+       --envInput  [path/to/cell-specific_ATAC_hg19_zscore.bigwig] \
+       --csvOutput TESTNAME_std.atac.csv
+
+awk -F, 'BEGIN {OFS=""; map="ACGT"} {for (i=1; i<=NF; i++) printf "%s", substr(map, $i+1, 1); print ""}' \
+    TESTNAME_std.oseq.csv > TESTNAME_std.oseq.txt
+
+python3 supp1.embedding.py
+
+for i in {00..04}; do
+  g4beacon2 getValidatedG4s \
+    --seqCSV 		DNABERT2_TESTNAME_std.oseq.csv \
+    --atacCSV	 	TESTNAME_std.atac.csv \
+    --originBED 	TESTNAME_std.origin.bed \
+    --model		G4Beacon2/models/zscoreDNABERT2_HepG2_ES${i}_0517model.checkpoint.joblib \
+    -o TESTNAME_std_predicion_ES${i}_std.bed
+done
+
+paste TESTNAME_std_predicion_ES00_std.bed \
+      TESTNAME_std_predicion_ES01_std.bed \
+      TESTNAME_std_predicion_ES02_std.bed \
+      TESTNAME_std_predicion_ES03_std.bed \
+      TESTNAME_std_predicion_ES04_std.bed \
+      | awk '{sum=($4+$8+$12+$16+$20)/5; print $1"\t"$2"\t"$3"\t"sum}' \
+      > TESTNAME_std_predicion_CellScore_std.bed
+
+# 2. Perform saturation mutagenesis (ISM).
+python3 supp2.mutateISM2.0.py > log.txt
+python3 supp3.embedding.py
+
+# 3. Predict the mutated sequences.
+bash supp4a.getTimes.sh
+bash supp4b.getTimes.sh
+bash supp5.prediction.sh
+bash supp6.matrix.sh
+
+# 4. Evaluate the output results.
+# In the previous steps, a file named TESTNAME_std_prediction_CellScore_std.bed will be generated, which includes the initially provided BED file along with the predicted scores. Please use the predicted scores as the reference and replace the NULL values in the code before running it.
+
+python3 ISM.py
+
+```
 
