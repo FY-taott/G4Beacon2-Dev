@@ -16,6 +16,8 @@ This repository contains the source code for [G4Beacon2](https://github.com/FY-t
 - [10. Non-pG4 Analysis](#10-non-pg4-analysis)
 - [11. Mutation Analysis](#11-mutation-analysis)
 - [12. ISM Analysis](#12-ism-analysis)
+- [13. Isolated PQS](#13-isolated-pqs)
+- [14. Biological Insights](#14-biological-insights)
 
 ## 0. User Guide
 We would like to provide two important clarifications here. First, we will explain the guidelines for including code in this repository to ensure there are no misunderstandings during its use. Then, we will offer some recommendations to help ensure the code functions as intended and delivers the expected results.
@@ -486,3 +488,95 @@ python3 ISM.py
 
 ```
 
+**Warning**: ISM is exploratory; we recommend Sections 11 or 13 for mutation-based analyses.
+
+
+Due to the robustness of G4-forming sequences, single-nucleotide substitutions may not fully disrupt G4-forming potential. For example, GGGG → GGGN may still preserve a G-run, and some mutations may generate bulges or other non-canonical G4 motifs. Therefore, ISM may have only a limited impact on the predicted score.
+
+
+## 13. Isolated PQS
+PQSs are frequently located in close proximity to other PQSs in the genome, which may complicate the interpretation of mutation-based perturbation analyses. To improve the specificity of the analysis, we focus on isolated PQSs by excluding PQSs that have another PQS within a 1-kb window. Here, we introduce a mutation analysis strategy specifically designed for isolated PQSs.
+
+### 13.1 Get Isolated PQS
+```bash
+## Predicted_human_G4.txt can be downloaded in EndoQuad
+awk '{print $1, $2, $3, $21, $7, $4}' FS='\t' OFS='\t' Predicted_human_G4.txt > Predicted_Human_G4_bed6.txt
+tail -n +2 Predicted_Human_G4_bed6.txt > Predicted_Human_G4.bed6
+
+sort -k1,1 -k2,2n Predicted_Human_G4.bed6 > G4.sorted.bed
+
+bedtools window -a G4.sorted.bed -b G4.sorted.bed -l 1000 -r 1000 | \
+awk 'BEGIN{OFS="\t"} !($1==$7 && $2==$8 && $3==$9){print $1,$2,$3}' | \
+sort -u > G4_with_neighbor_1kb.bed
+
+bedtools subtract -a G4.sorted.bed -b G4_with_neighbor_1kb.bed -A > lonely_G4.bed
+
+bedtools intersect -a lonely_G4.bed \
+                   -b sorted_K562_hg19.bed \
+                   -wa -u > lonely.K562.bed
+```
+
+### 13.2 Mutation
+We first need to create the required directory and place the supplementary scripts for this section in the ***plus*** folder. The main script should then be executed from the root directory. This section uses plus as an example to demonstrate the workflow.
+```bash
+
+cd plus
+
+g4beacon2 seqFeatureConstruct \
+    -i 		lonely.K562_plus.bed \
+    -oseq 	lonely.K562_plus.oseq.csv \
+    -obi 		lonely.K562_plus.origin.bed \
+    -fi 		[path/to/hg19.fa]
+
+g4beacon2 atacFeatureConstruct \
+       -p          24 \
+       --g4Input   lonely.K562_plus.origin.bed \
+       --envInput  [path/to/K562_ATAC_hg19_zscore.bigwig] \
+       --csvOutput lonely.K562_plus.atac.csv
+
+awk -F, 'BEGIN {OFS=""; map="ACGT"} {for (i=1; i<=NF; i++) printf "%s", substr(map, $i+1, 1); print ""}' \
+    lonely.K562_plus.oseq.csv > lonely.K562_plus.oseq.txt
+
+python3 supp1.embedding.py
+
+for i in {00..04}; do
+  g4beacon2 getValidatedG4s \
+    --seqCSV 		DNABERT2_lonely.K562_plus.oseq.csv \
+    --atacCSV	 	lonely.K562_plus.atac.csv \
+    --originBED 	lonely.K562_plus.origin.bed \
+    --model		[path/to/zscoreDNABERT2_HepG2_ES${i}_0517model.checkpoint.joblib] \
+    -o HepG2onK562_0.5_ES${i}_plus.bed
+done
+
+paste HepG2onK562_0.5_ES00_plus.bed \
+      HepG2onK562_0.5_ES01_plus.bed \
+      HepG2onK562_0.5_ES02_plus.bed \
+      HepG2onK562_0.5_ES03_plus.bed \
+      HepG2onK562_0.5_ES04_plus.bed \
+      | awk '{sum=($4+$8+$12+$16+$20)/5; print $1"\t"$2"\t"$3"\t"sum}' \
+      > HepG2onK562_0.5_CellScore_plus.bed
+
+bash main.predict.sh
+```
+
+## 14. Biological Insights
+We stratified the predicted scores into distinct intervals and integrated cell-type-specific chromatin-state annotations from the Roadmap Epigenomics 18-state ChromHMM model, together with TFBS data, to investigate potential biological insights associated with the predictions.
+```bash
+
+mkdir -p 1.G4_bins
+cp [path/to/predicted/data] 1.G4_bins/HepG2onK562_merged.bed
+
+awk '{
+  if      ($4>=0     && $4<=0.001) print > "1.G4_bins/00_0_0.001_forHMM.bed";
+  else if ($4>0.001 && $4<=0.1)   print > "1.G4_bins/01_0.001_0.1_forHMM.bed";
+  else if ($4>0.1   && $4<=0.5)   print > "1.G4_bins/02_0.1_0.5_forHMM.bed";
+  else if ($4>0.5   && $4<=0.9)   print > "1.G4_bins/03_0.5_0.9_forHMM.bed";
+  else if ($4>0.9   && $4<=0.999) print > "1.G4_bins/04_0.9_0.999_forHMM.bed";
+  else if ($4>0.999 && $4<=1)     print > "1.G4_bins/05_0.999_1_forHMM.bed";
+}' 1.G4_bins/HepG2onK562_merged.bed
+
+wc -l 1.G4_bins/HepG2onK562_merged.bed 1.G4_bins/*_forHMM.bed
+
+bash TFBS.sh
+bash HMM.sh
+```
