@@ -18,6 +18,7 @@ This repository contains the source code for [G4Beacon2](https://github.com/FY-t
 - [12. ISM Analysis](#12-ism-analysis)
 - [13. Isolated PQS](#13-isolated-pqs)
 - [14. Biological Insights](#14-biological-insights)
+- [15. AME](#15-ame)
 
 ## 0. User Guide
 We would like to provide two important clarifications here. First, we will explain the guidelines for including code in this repository to ensure there are no misunderstandings during its use. Then, we will offer some recommendations to help ensure the code functions as intended and delivers the expected results.
@@ -559,6 +560,12 @@ paste HepG2onK562_0.5_ES00_plus.bed \
 bash main.predict.sh
 ```
 
+After all required score files have been generated, run filt.sh to merge the results and retain entries with original G4Beacon2 prediction scores > 0.5 for the mutation analysis of sequence features contributing to positive G4Beacon2 predictions.
+
+```bash
+bash filt.sh
+```
+
 ## 14. Biological Insights
 We stratified the predicted scores into distinct intervals and integrated cell-type-specific chromatin-state annotations from the Roadmap Epigenomics 18-state ChromHMM model, together with TFBS data, to investigate potential biological insights associated with the predictions.
 ```bash
@@ -579,4 +586,30 @@ wc -l 1.G4_bins/HepG2onK562_merged.bed 1.G4_bins/*_forHMM.bed
 
 bash TFBS.sh
 bash HMM.sh
+```
+
+## 15. AME
+To rule out the possibility that the consecutive-G motif enrichment identified by MEME was simply driven by the high GC content of the positive sequences, we generated GC-matched controls using two control modules, sequence shuffling and genomic matching, and evaluated motif enrichment using AME.
+
+Note: Separate conda environments are used for BiasAway and gkmSVM to avoid potential dependency conflicts. This reflects our laboratory convention of using one dedicated virtual environment per independent tool **rather than a strict requirement**. The conda activate steps may be **omitted** if no dependency conflicts occur.
+```bash
+
+## Eight settings were evaluated, with 100 control sets generated for each setting, resulting in 800 control sets in total.
+
+conda activate gccontrol
+bash 00_prepare.sh
+
+## Scripts 01-03 are independent after 00_prepare.sh and may be run in parallel.
+conda activate gccontrol
+bash 01_meme_ushuffle.sh
+
+conda activate biasaway
+bash 02_biasaway.sh
+
+conda activate gkmsvm
+Rscript 03_gkmsvm.R
+
+## Finally, each control set was separately compared with the same foreground using AME.
+conda activate gccontrol
+bash 04_ame.sh
 ```
